@@ -19,45 +19,61 @@ public class VehiculoServiceImpl implements GenericService<Vehiculo> {
         this.vehiculoDAO = vehiculoDAO;
         this.seguroService = seguroService;
     }
-    
-    private void validar(Vehiculo vehiculo) throws IllegalArgumentException {
+
+    // ============================================================
+    // VALIDACIONES DE NEGOCIO (OBLIGATORIAS POR CONSIGNA)
+    // ============================================================
+    private void validar(Vehiculo vehiculo) {
+
         if (vehiculo == null) {
-            throw new IllegalArgumentException("El objeto Vehiculo no puede ser nulo.");
+            throw new IllegalArgumentException("El vehiculo no puede ser nulo.");
         }
+
         if (vehiculo.getDominio() == null || vehiculo.getDominio().trim().isEmpty()) {
-            throw new IllegalArgumentException("El dominio (patente) es obligatorio.");
+            throw new IllegalArgumentException("El dominio es obligatorio.");
         }
+
         if (vehiculo.getMarca() == null || vehiculo.getMarca().trim().isEmpty()) {
             throw new IllegalArgumentException("La marca es obligatoria.");
         }
-        if (vehiculo.getAnio() > LocalDate.now().getYear() + 1 || vehiculo.getAnio() < 1950) {
-            throw new IllegalArgumentException("El ano de fabricacion es invalido.");
+
+        if (vehiculo.getModelo() == null || vehiculo.getModelo().trim().isEmpty()) {
+            throw new IllegalArgumentException("El modelo es obligatorio.");
         }
+
+        int anio = vehiculo.getAnio();
+        int actual = LocalDate.now().getYear();
+        if (anio < 1950 || anio > actual + 1) {
+            throw new IllegalArgumentException("El año debe estar entre 1950 y " + (actual + 1));
+        }
+
         if (vehiculo.getNroChasis() == null || vehiculo.getNroChasis().trim().isEmpty()) {
-            throw new IllegalArgumentException("El numero de chasis es obligatorio.");
+            throw new IllegalArgumentException("El número de chasis es obligatorio.");
         }
     }
-    
+
+    // ============================================================
+    // VALIDACION DE UNICIDAD DE DOMINIO
+    // ============================================================
     public void validarUnicidad(String dominio) throws Exception {
+        // 🔥 ESTA ES LA FIRMA CORRECTA SEGÚN TU DAO
         if (vehiculoDAO.buscarPorCampoClave(dominio.toUpperCase(), null) != null) {
             throw new IllegalArgumentException("Ya existe un vehiculo activo con el dominio: " + dominio);
         }
     }
 
-    /**
-     * Inserta un Vehiculo y, opcionalmente, su Seguro asociado en una única transacción.
-     */
+    // ============================================================
+    // INSERTAR (Vehículo + Seguro en una única transacción)
+    // ============================================================
     @Override
     public void insertar(Vehiculo vehiculo) throws Exception {
+
         validar(vehiculo);
         validarUnicidad(vehiculo.getDominio());
-        
-        // 1. Validar unicidad de la Poliza (si hay seguro) y otros campos de B
+
+        // Validamos el seguro si viene en el objeto
         if (vehiculo.getSeguro() != null) {
             seguroService.validar(vehiculo.getSeguro());
-            // Se debe validar la unicidad de la poliza DENTRO de la transaccion
-            // para evitar race conditions, pero por simplicidad se hace aqui con una conexion simple
-            // (el DAO que busca por clave ya usa su propia conexion).
             seguroService.validarUnicidadPoliza(vehiculo.getSeguro().getNroPoliza(), null);
         }
 
@@ -66,40 +82,44 @@ public class VehiculoServiceImpl implements GenericService<Vehiculo> {
 
             tm.startTransaction();
 
-            // 2. Insertar Vehiculo (Clase A)
+            // 1 — Insertamos el vehículo
             long vehiculoId = vehiculoDAO.insertarTx(vehiculo, tm.getConnection());
-            vehiculo.setId(vehiculoId); // Asegurar que el objeto tiene el ID generado
+            vehiculo.setId(vehiculoId);
 
-            // 3. Insertar Seguro (Clase B) si existe
+            // 2 — Insertamos el seguro si existe
             if (vehiculo.getSeguro() != null) {
                 SeguroVehicular seguro = vehiculo.getSeguro();
-                
-                // --- LLAMADA CORREGIDA: Pasar el ID del Vehiculo al DAO para la FK ---
-                long seguroId = vehiculoDAO.seguroDAO.insertarTx(seguro, vehiculoId, tm.getConnection());
+
+                long seguroId = vehiculoDAO.seguroDAO.insertarTx(
+                        seguro, vehiculoId, tm.getConnection()
+                );
                 seguro.setId(seguroId);
             }
 
             tm.commit();
 
         } catch (Exception e) {
-            System.err.println("La transaccion de insercion fallo. Rollback asegurado.");
-            throw new Exception("Error en la transaccion: " + e.getMessage());
+            throw new Exception("Error en la transaccion de insercion: " + e.getMessage());
         }
     }
-    
+
+    // ============================================================
+    // ACTUALIZAR (Vehículo + Seguro)
+    // ============================================================
     @Override
     public void actualizar(Vehiculo vehiculo) throws Exception {
+
         validar(vehiculo);
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
              TransactionManager tm = new TransactionManager(conn)) {
 
             tm.startTransaction();
 
-            // 1. Actualizar Vehiculo (A)
+            // Actualizar A
             vehiculoDAO.actualizarTx(vehiculo, tm.getConnection());
 
-            // 2. Actualizar Seguro (B) si existe
+            // Actualizar B si hay seguro
             if (vehiculo.getSeguro() != null) {
                 seguroService.validar(vehiculo.getSeguro());
                 vehiculoDAO.seguroDAO.actualizarTx(vehiculo.getSeguro(), tm.getConnection());
@@ -108,51 +128,53 @@ public class VehiculoServiceImpl implements GenericService<Vehiculo> {
             tm.commit();
 
         } catch (Exception e) {
-            System.err.println("La transaccion de actualizacion fallo. Rollback asegurado.");
-            throw new Exception("Error en la transaccion: " + e.getMessage());
+            throw new Exception("Error en la transaccion de actualizacion: " + e.getMessage());
         }
     }
-    
+
+    // ============================================================
+    // ELIMINAR (Baja lógica A + B)
+    // ============================================================
     @Override
-    public void eliminar(int id) throws Exception { 
-        Vehiculo vehiculo = vehiculoDAO.getById(id); 
-        
+    public void eliminar(int id) throws Exception {
+
+        Vehiculo vehiculo = vehiculoDAO.getById(id);
         if (vehiculo == null) {
             throw new Exception("Vehiculo con ID " + id + " no encontrado o ya eliminado.");
         }
-        
+
         try (Connection conn = DatabaseConnection.getConnection();
              TransactionManager tm = new TransactionManager(conn)) {
 
             tm.startTransaction();
-            
-            // 1. Baja logica de Vehiculo (A)
+
             vehiculoDAO.eliminarTx(id, tm.getConnection());
-            
-            // 2. Baja logica de Seguro (B) si existe
+
             if (vehiculo.getSeguro() != null) {
                 int seguroId = (int) vehiculo.getSeguro().getId();
                 vehiculoDAO.seguroDAO.eliminarTx(seguroId, tm.getConnection());
             }
 
             tm.commit();
-            
+
         } catch (Exception e) {
-            System.err.println("La transaccion de eliminacion (baja logica) fallo. Rollback asegurado.");
-            throw new Exception("Error en la transaccion: " + e.getMessage());
+            throw new Exception("Error en la transaccion de eliminacion: " + e.getMessage());
         }
     }
-    
+
+    // ============================================================
+    // GETTERS
+    // ============================================================
     @Override
-    public Vehiculo getById(int id) throws Exception { 
+    public Vehiculo getById(int id) throws Exception {
         return vehiculoDAO.getById(id);
     }
-    
+
     @Override
-    public List<Vehiculo> getAll() throws Exception { 
+    public List<Vehiculo> getAll() throws Exception {
         return vehiculoDAO.getAll();
     }
-    
+
     public Vehiculo buscarPorDominio(String dominio) throws Exception {
         return vehiculoDAO.buscarPorCampoClave(dominio.toUpperCase(), null);
     }
