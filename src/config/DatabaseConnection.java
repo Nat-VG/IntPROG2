@@ -10,7 +10,7 @@ public final class DatabaseConnection {
     private static final String USER = "root";
     
     // ATENCION: Poner tu contrasena de MySQL aqui
-    private static final String PASSWORD = ""; // O la contrasena que uses
+    private static final String PASSWORD = "1234"; // O la contrasena que uses
 
     static {
         try {

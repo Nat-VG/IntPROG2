@@ -1,5 +1,5 @@
 -- ============================================================
---   SCRIPT COMPLETO DE INICIALIZACIÓN DEL TPI 
+--   SCRIPT COMPLETO DE INICIALIZACION DEL TPI 
 --   Crea la base, tablas, restricciones e inserta datos.
 -- ============================================================
 
@@ -15,13 +15,13 @@ USE BaseVehiculos;
 -- ============================================================
 CREATE TABLE vehiculo (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  eliminado TINYINT(1) DEFAULT 0,
+  eliminado TINYINT DEFAULT 0,
   dominio VARCHAR(10) NOT NULL UNIQUE,
   marca VARCHAR(50) NOT NULL,
   modelo VARCHAR(50) NOT NULL,
 
-  -- Rango sincronizado con validaciones en Java
-  anio INT CHECK (anio BETWEEN 1950 AND YEAR(CURDATE()) + 1),
+  -- La validación de rango (1950–añoActual+1) se hace en Java.
+  anio INT NOT NULL,
 
   nroChasis VARCHAR(50) UNIQUE
 ) ENGINE = InnoDB;
@@ -31,7 +31,7 @@ CREATE TABLE vehiculo (
 -- ============================================================
 CREATE TABLE segurovehicular (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  eliminado TINYINT(1) DEFAULT 0,
+  eliminado TINYINT DEFAULT 0,
   aseguradora VARCHAR(80) NOT NULL,
   nroPoliza VARCHAR(50) UNIQUE NOT NULL,
   cobertura ENUM('RC', 'TERCEROS', 'TODO_RIESGO') NOT NULL,
@@ -48,7 +48,6 @@ CREATE TABLE segurovehicular (
 -- ============================================================
 -- 5. INSERTS DE PRUEBA (OPCIONALES PARA CORRECCIÓN)
 -- ============================================================
-
 INSERT INTO vehiculo (dominio, marca, modelo, anio, nroChasis)
 VALUES 
 ('AA111AA', 'Toyota', 'Corolla', 2020, 'CHS-TY-001'),
@@ -61,4 +60,4 @@ VALUES
 ('Sancor', 'POL123', 'RC', DATE_ADD(CURDATE(), INTERVAL 120 DAY), 1),
 ('LaCaja', 'POL555', 'TERCEROS', DATE_ADD(CURDATE(), INTERVAL 200 DAY), 2);
 
--- Vehículo 3 queda sin seguro para probar opción 6
+-- Vehículo 3 queda sin seguro para probar opcion 6

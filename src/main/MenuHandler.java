@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * Controlador de las operaciones del menu (Menu Handler).
  * Maneja la interacción con el usuario y aplica validaciones de entrada inmediatas
  * con ciclo cerrado (repite la pregunta hasta que el dato es valido), incluyendo la
- * verificacion de unicidad del Dominio.
+ * verificacion de unicidad del Dominio y la Póliza.
  */
 public class MenuHandler {
     
@@ -41,31 +41,37 @@ public class MenuHandler {
 
     // --- CRUD VEHICULO (A + B) ---
 
+    /**
+     * MEJORA: Ahora valida los dos campos unicos (Dominio y Poliza)
+     * de forma proactiva ANTES de pedir el resto de los datos.
+     */
     public void crearVehiculoConSeguro() {
         try {
             System.out.println("\n--- 1. Crear Vehiculo (Transaccional) ---");
             
-            // 🚨 CAMBIO CRÍTICO: LECTURA, VALIDACION DE FORMATO Y UNICIDAD INMEDIATA
-            String dominio = leerDominioYValidarUnicidad("Dominio (Patente LLNNNLL, ej. AB123CD): "); 
+            // --- INICIO MODIFICACIÓN ---
+            // 1. Validar campos clave de unicidad (A y B)
+            System.out.println("--- Validacion de Campos Unicos ---");
+            String dominio = leerDominioYValidarUnicidad("Paso 1/9 - Dominio (Patente LLNNNLL, ej. AB123CD): "); 
+            String nroPoliza = leerPolizaYValidarUnicidad("Paso 2/9 - Nro. Poliza (Unico): ");
             
-            String marca = leerString("Marca: ");
-            String modelo = leerString("Modelo: ");
-            int anio = leerInt("Ano (ej. 2024): ", 1950, LocalDate.now().getYear() + 1);
-            String nroChasis = leerString("Nro. Chasis: ");
+            System.out.println("\n--- Datos del Vehiculo (A) ---");
+            // 2. Pedir resto de datos (ya no pedimos dominio)
+            String marca = leerString("Paso 3/9 - Marca: ");
+            String modelo = leerString("Paso 4/9 - Modelo: ");
+            int anio = leerInt("Paso 5/9 - Ano (ej. 2024): ", 1950, LocalDate.now().getYear() + 1);
+            String nroChasis = leerString("Paso 6/9 - Nro. Chasis: ");
             
             Vehiculo vehiculo = new Vehiculo(0, false, dominio, marca, modelo, anio, nroChasis);
             
-            System.out.println("--- Datos del Seguro (Requerido) ---");
-            String aseguradora = leerString("Aseguradora: ");
-            
-            // NOTA: La unicidad de Nro. Poliza se deja en la capa Service/DAO
-            // ya que suele requerir una conexión transaccional más compleja
-            // y no es la clave de búsqueda principal como el Dominio.
-            String nroPoliza = leerString("Nro. Poliza: ");
-            Cobertura cobertura = leerCobertura();
-            LocalDate vencimiento = leerFecha("Fecha Vencimiento (YYYY-MM-DD): ");
+            System.out.println("\n--- Datos del Seguro (B) ---");
+            // 3. Pedir resto de datos (ya no pedimos poliza)
+            String aseguradora = leerString("Paso 7/9 - Aseguradora: ");
+            Cobertura cobertura = leerCobertura(); // (Paso 8/9)
+            LocalDate vencimiento = leerFecha("Paso 9/9 - Fecha Vencimiento (YYYY-MM-DD): ");
             
             SeguroVehicular seguro = new SeguroVehicular(0, false, aseguradora, nroPoliza, cobertura, vencimiento);
+            // --- FIN MODIFICACIÓN ---
             
             vehiculo.setSeguro(seguro);
             
@@ -110,6 +116,10 @@ public class MenuHandler {
         imprimirVehiculoFormatoCuadro(v);
     }
     
+    /**
+     * CORREGIDO: Ahora usa un helper 'leerIntOpcional' para el año,
+     * evitando la salida al menú si el formato es incorrecto.
+     */
     public void actualizarVehiculo() {
         System.out.println("\n--- 4. Actualizar Vehiculo (Transaccional) ---");
         try {
@@ -122,28 +132,31 @@ public class MenuHandler {
             }
             
             System.out.println("Datos actuales: Modelo=" + v.getModelo() + ", Ano=" + v.getAnio());
-            String nuevoModelo = leerStringOpcional("Nuevo Modelo (Dejar vacio para no cambiar): ");
             
-            // Lógica de actualización de año con validación (ciclo cerrado)
-            int nuevoAnio = v.getAnio();
-            String nuevoAnioStr = leerStringOpcional("Nuevo Ano (Dejar vacio para no cambiar): ");
-            if (!nuevoAnioStr.isEmpty()) {
-                try {
-                    nuevoAnio = Integer.parseInt(nuevoAnioStr);
-                    if (nuevoAnio < 1950 || nuevoAnio > LocalDate.now().getYear() + 1) {
-                         throw new NumberFormatException("El ano es invalido.");
-                    }
-                    v.setAnio(nuevoAnio);
-                } catch (NumberFormatException e) {
-                    System.err.println("ERROR: El año ingresado no es un número entero válido o está fuera de rango (1950-" + (LocalDate.now().getYear() + 1) + ").");
-                    return; 
-                }
+            // --- INICIO DE LA CORRECCIÓN ---
+            
+            String nuevoModelo = leerStringOpcional("Nuevo Modelo (Dejar vacio para no cambiar [" + v.getModelo() + "]): ");
+            
+            // Usamos el nuevo helper con ciclo cerrado
+            int nuevoAnio = leerIntOpcional(
+                "Nuevo Ano (Dejar vacio para no cambiar [" + v.getAnio() + "]): ",
+                v.getAnio(), // Valor por defecto si presiona Enter
+                1950, 
+                LocalDate.now().getYear() + 1
+            );
+            
+            // Asignamos los nuevos valores
+            if (!nuevoModelo.isEmpty()) {
+                v.setModelo(nuevoModelo);
             }
+            v.setAnio(nuevoAnio); // Siempre seteamos el año (sea el viejo o el nuevo)
             
-            if (!nuevoModelo.isEmpty()) v.setModelo(nuevoModelo);
+            // --- FIN DE LA CORRECCIÓN ---
             
             if (v.getSeguro() != null) {
                 System.out.println("Datos actuales Seguro: Poliza=" + v.getSeguro().getNroPoliza());
+                // (Nota: Faltaría validación de unicidad si se cambia la póliza aquí,
+                // pero se deja así por simplicidad, la capa Service lo validará)
                 String nuevaPoliza = leerStringOpcional("Nueva Poliza (Dejar vacio para no cambiar): ");
                 if (!nuevaPoliza.isEmpty()) v.getSeguro().setNroPoliza(nuevaPoliza);
             } else {
@@ -188,8 +201,9 @@ public class MenuHandler {
                  return;
             }
             
+            // Usamos el validador proactivo también aquí
+            String nroPoliza = leerPolizaYValidarUnicidad("Nro. Poliza (Unico): ");
             String aseguradora = leerString("Aseguradora: ");
-            String nroPoliza = leerString("Nro. Poliza: ");
             Cobertura cobertura = leerCobertura();
             LocalDate vencimiento = leerFecha("Fecha Vencimiento (YYYY-MM-DD): ");
             
@@ -312,7 +326,7 @@ public class MenuHandler {
         String dominioLimpio = input.trim().toUpperCase().replace(" ", "").replace("-", "");
 
         if (!PATTERN.matcher(dominioLimpio).matches()) {
-            throw new IllegalArgumentException("El formato del dominio es incorrecto. Debe ser LL NNN LL (ej. AB 123 CD).");
+            throw new IllegalArgumentException("El formato del dominio es incorrecto. Debe ser LLNNNLL (ej. AB123CD).");
         }
         
         return dominioLimpio;
@@ -365,6 +379,31 @@ public class MenuHandler {
             }
         }
     }
+    
+    /**
+     * (NUEVO MÉTODO AUXILIAR)
+     * Lee la entrada del usuario para la Póliza, valida unicidad (ciclo cerrado).
+     * Se usa para la creación.
+     */
+    private String leerPolizaYValidarUnicidad(String mensaje) {
+        String input;
+        while (true) {
+            // Reutiliza leerString para asegurar que no esté vacío
+            input = leerString(mensaje); 
+            try {
+                // 1. Validar Unicidad (Regla de Negocio)
+                if (seguroService.buscarPorPoliza(input) != null) {
+                    throw new IllegalArgumentException("ERROR DE UNICIDAD: Ya existe un seguro activo con la poliza " + input + ".");
+                }
+                return input; // Es único y no está vacío
+                
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error: " + e.getMessage());
+            } catch (Exception e) {
+                System.err.println("Error al verificar unicidad en la BD: " + e.getMessage());
+            }
+        }
+    }
 
     /**
      * Lee un String obligatorio, repite si está vacío (ciclo cerrado).
@@ -413,6 +452,36 @@ public class MenuHandler {
                 }
             } catch (NumberFormatException e) {
                 System.err.println("Error: Debe ingresar un numero entero valido.");
+            }
+        }
+    }
+    
+    /**
+     * (NUEVO MÉTODO AUXILIAR PARA CORRECCIÓN)
+     * Lee un entero OPCIONAL. Si el usuario presiona Enter, devuelve un valor por defecto.
+     * Si ingresa texto, valida que sea un número en el rango (ciclo cerrado).
+     */
+    private int leerIntOpcional(String mensaje, int valorPorDefecto, int min, int max) {
+        while (true) {
+            try {
+                System.out.print(mensaje);
+                String inputStr = scanner.nextLine().trim();
+                
+                if (inputStr.isEmpty()) {
+                    return valorPorDefecto; // El usuario no quiso cambiarlo
+                }
+                
+                int input = Integer.parseInt(inputStr);
+
+                if (input < min || input > max) {
+                    System.err.println("Error: El numero debe estar entre " + min + " y " + max + ".");
+                    System.err.println("Ejemplo: 2023");
+                } else {
+                    return input; // Sale del ciclo con el nuevo valor
+                }
+            } catch (NumberFormatException e) {
+                System.err.println("Error: Debe ingresar un numero entero valido.");
+                System.err.println("Ejemplo: 2023");
             }
         }
     }

@@ -16,7 +16,7 @@ public class MenuDisplay {
         System.out.println("|    VEHICULOS (CRUD Compuesto A + B)               |");
         System.out.println("|---------------------------------------------------|");
         System.out.println("| 1. Crear Vehiculo (con Seguro, Transaccional)     |");
-        System.out.println("| 2. Listar todos los Vehiculos (con Seguros)       |");
+        System.out.println("| 2. Listar todos los Vehiculos                     |");
         System.out.println("| 3. Buscar Vehiculo por ID (con Seguro)            |");
         System.out.println("| 4. Actualizar Vehiculo (y su Seguro)              |");
         System.out.println("| 5. Eliminar Vehiculo (Baja Logica A y B)          |");
