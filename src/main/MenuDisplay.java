@@ -21,7 +21,7 @@ public class MenuDisplay {
         System.out.println("| 4. Actualizar Vehiculo (y su Seguro)              |");
         System.out.println("| 5. Eliminar Vehiculo (Baja Logica A y B)          |");
         System.out.println("|                                                   |");
-        System.out.println("|  ️  SEGUROS (CRUD Individual B)                    |");
+        System.out.println("|    SEGUROS (CRUD Individual B)                    |");
         System.out.println("|---------------------------------------------------|");
         System.out.println("| 6. Crear Seguro (para Vehiculo existente)         |"); 
         System.out.println("| 7. Actualizar Seguro por ID                       |"); 

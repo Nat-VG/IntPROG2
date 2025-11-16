@@ -11,13 +11,24 @@ import java.time.format.DateTimeParseException;
 import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Scanner;
+import java.util.regex.Pattern; 
 
+/**
+ * Controlador de las operaciones del menu (Menu Handler).
+ * Maneja la interacción con el usuario y aplica validaciones de entrada inmediatas
+ * con ciclo cerrado (repite la pregunta hasta que el dato es valido), incluyendo la
+ * verificacion de unicidad del Dominio.
+ */
 public class MenuHandler {
     
     private final Scanner scanner;
     private final VehiculoServiceImpl vehiculoService;
     private final SeguroVehicularServiceImpl seguroService;
 
+    // PATRON DE REGEX PARA EL FORMATO DE DOMINIO (LLNNNLL)
+    private static final String PATRON_DOMINIO = "^[A-Z]{2}[0-9]{3}[A-Z]{2}$";
+    private static final Pattern PATTERN = Pattern.compile(PATRON_DOMINIO);
+    
     public MenuHandler(Scanner scanner, VehiculoServiceImpl vehiculoService, SeguroVehicularServiceImpl seguroService) {
         this.scanner = scanner;
         this.vehiculoService = vehiculoService;
@@ -33,7 +44,10 @@ public class MenuHandler {
     public void crearVehiculoConSeguro() {
         try {
             System.out.println("\n--- 1. Crear Vehiculo (Transaccional) ---");
-            String dominio = leerString("Dominio (Patente): ");
+            
+            // 🚨 CAMBIO CRÍTICO: LECTURA, VALIDACION DE FORMATO Y UNICIDAD INMEDIATA
+            String dominio = leerDominioYValidarUnicidad("Dominio (Patente LLNNNLL, ej. AB123CD): "); 
+            
             String marca = leerString("Marca: ");
             String modelo = leerString("Modelo: ");
             int anio = leerInt("Ano (ej. 2024): ", 1950, LocalDate.now().getYear() + 1);
@@ -43,6 +57,10 @@ public class MenuHandler {
             
             System.out.println("--- Datos del Seguro (Requerido) ---");
             String aseguradora = leerString("Aseguradora: ");
+            
+            // NOTA: La unicidad de Nro. Poliza se deja en la capa Service/DAO
+            // ya que suele requerir una conexión transaccional más compleja
+            // y no es la clave de búsqueda principal como el Dominio.
             String nroPoliza = leerString("Nro. Poliza: ");
             Cobertura cobertura = leerCobertura();
             LocalDate vencimiento = leerFecha("Fecha Vencimiento (YYYY-MM-DD): ");
@@ -73,7 +91,7 @@ public class MenuHandler {
         }
         
         for (Vehiculo v : vehiculos) {
-            System.out.println(v.toString());
+            imprimirVehiculoFormatoCuadro(v);
             System.out.println("--------------------");
         }
     }
@@ -81,7 +99,6 @@ public class MenuHandler {
     public void buscarVehiculoPorId() throws Exception {
         System.out.println("\n--- 3. Buscar Vehiculo por ID ---");
         int id = leerInt("Ingrese ID del Vehiculo: ", 1, Integer.MAX_VALUE);
-        
         Vehiculo v = vehiculoService.getById(id);
         
         if (v == null) {
@@ -94,8 +111,8 @@ public class MenuHandler {
     }
     
     public void actualizarVehiculo() {
-         System.out.println("\n--- 4. Actualizar Vehiculo (Transaccional) ---");
-         try {
+        System.out.println("\n--- 4. Actualizar Vehiculo (Transaccional) ---");
+        try {
             int id = leerInt("Ingrese ID del Vehiculo a actualizar: ", 1, Integer.MAX_VALUE);
             Vehiculo v = vehiculoService.getById(id);
             
@@ -106,10 +123,24 @@ public class MenuHandler {
             
             System.out.println("Datos actuales: Modelo=" + v.getModelo() + ", Ano=" + v.getAnio());
             String nuevoModelo = leerStringOpcional("Nuevo Modelo (Dejar vacio para no cambiar): ");
+            
+            // Lógica de actualización de año con validación (ciclo cerrado)
+            int nuevoAnio = v.getAnio();
             String nuevoAnioStr = leerStringOpcional("Nuevo Ano (Dejar vacio para no cambiar): ");
+            if (!nuevoAnioStr.isEmpty()) {
+                try {
+                    nuevoAnio = Integer.parseInt(nuevoAnioStr);
+                    if (nuevoAnio < 1950 || nuevoAnio > LocalDate.now().getYear() + 1) {
+                         throw new NumberFormatException("El ano es invalido.");
+                    }
+                    v.setAnio(nuevoAnio);
+                } catch (NumberFormatException e) {
+                    System.err.println("ERROR: El año ingresado no es un número entero válido o está fuera de rango (1950-" + (LocalDate.now().getYear() + 1) + ").");
+                    return; 
+                }
+            }
             
             if (!nuevoModelo.isEmpty()) v.setModelo(nuevoModelo);
-            if (!nuevoAnioStr.isEmpty()) v.setAnio(Integer.parseInt(nuevoAnioStr));
             
             if (v.getSeguro() != null) {
                 System.out.println("Datos actuales Seguro: Poliza=" + v.getSeguro().getNroPoliza());
@@ -121,10 +152,9 @@ public class MenuHandler {
             
             vehiculoService.actualizar(v);
             System.out.println("EXITO: Vehiculo actualizado (Transaccion OK).");
-
-         } catch (Exception e) {
+        } catch (Exception e) {
              System.err.println("\nERROR AL ACTUALIZAR (Rollback ejecutado): " + e.getMessage());
-         }
+        }
     }
 
     public void eliminarVehiculo() {
@@ -153,7 +183,6 @@ public class MenuHandler {
                  System.err.println("Error: No existe ningun vehiculo activo con ID: " + idVehiculo);
                  return;
             }
-            // Validacion de unicidad 1:1
             if (v.getSeguro() != null) {
                  System.err.println("Error: El vehiculo con ID " + idVehiculo + " ya tiene un seguro asociado (Poliza " + v.getSeguro().getNroPoliza() + ").");
                  return;
@@ -166,7 +195,6 @@ public class MenuHandler {
             
             SeguroVehicular seguro = new SeguroVehicular(0, false, aseguradora, nroPoliza, cobertura, vencimiento);
             
-            // LLamada al service con la FK
             seguroService.insertar(seguro, idVehiculo);
             
             System.out.println("EXITO: Seguro independiente creado con ID: " + seguro.getId());
@@ -190,16 +218,15 @@ public class MenuHandler {
             System.out.println("Datos actuales: Poliza=" + s.getNroPoliza() + ", Vencimiento=" + s.getVencimiento());
             
             String nuevaPoliza = leerStringOpcional("Nueva Poliza (Dejar vacio para no cambiar): ");
-            String nuevaFechaStr = leerStringOpcional("Nueva Fecha Vencimiento YYYY-MM-DD (Dejar vacio para no cambiar): ");
+            
+            LocalDate nuevaFecha = leerFechaOpcional("Nueva Fecha Vencimiento YYYY-MM-DD (Dejar vacio para no cambiar): ");
             
             if (!nuevaPoliza.isEmpty()) s.setNroPoliza(nuevaPoliza);
-            if (!nuevaFechaStr.isEmpty()) s.setVencimiento(LocalDate.parse(nuevaFechaStr));
+            if (nuevaFecha != null) s.setVencimiento(nuevaFecha);
             
             seguroService.actualizar(s);
             System.out.println("EXITO: Seguro actualizado.");
             
-        } catch (DateTimeParseException e) {
-            System.err.println("\nERROR: Formato de fecha invalido. Use YYYY-MM-DD.");
         } catch (Exception e) {
             System.err.println("\nERROR AL ACTUALIZAR SEGURO: " + e.getMessage());
         }
@@ -239,7 +266,8 @@ public class MenuHandler {
 
     public void buscarVehiculoPorDominio() throws Exception {
         System.out.println("\n--- 10. Buscar Vehiculo por Dominio ---");
-        String dominio = leerString("Ingrese Dominio (Patente): ");
+        // Solo validamos el formato, ya que no estamos insertando
+        String dominio = leerDominio("Ingrese Dominio (Patente LLNNNLL): ");
         
         Vehiculo v = vehiculoService.buscarPorDominio(dominio);
         
@@ -266,11 +294,81 @@ public class MenuHandler {
         System.out.println("\nSeguro encontrado:");
         System.out.println(s.toString());
     }
-
+    
     // =================================================================
-    // MÉTODOS AUXILIARES
+    // MÉTODOS AUXILIARES CON CICLO CERRADO Y VALIDACIÓN DE FORMATO/UNICIDAD
     // =================================================================
 
+    /**
+     * Valida el formato del dominio y lo limpia (mayúsculas y sin espacios/guiones).
+     * @return El dominio limpio y validado.
+     */
+    private String validarDominioFormato(String input) throws IllegalArgumentException {
+        if (input == null || input.trim().isEmpty()) {
+            throw new IllegalArgumentException("El dominio no puede estar vacio.");
+        }
+        
+        // Limpiar: Mayusculas y quitar espacios y guiones
+        String dominioLimpio = input.trim().toUpperCase().replace(" ", "").replace("-", "");
+
+        if (!PATTERN.matcher(dominioLimpio).matches()) {
+            throw new IllegalArgumentException("El formato del dominio es incorrecto. Debe ser LL NNN LL (ej. AB 123 CD).");
+        }
+        
+        return dominioLimpio;
+    }
+    
+    /**
+     * Lee la entrada del usuario para el Dominio, aplicando validación inmediata (ciclo cerrado).
+     * Se usa para búsquedas donde solo importa el formato.
+     */
+    private String leerDominio(String mensaje) {
+        String input;
+        while (true) {
+            System.out.print(mensaje);
+            input = scanner.nextLine().trim();
+            try {
+                return validarDominioFormato(input);
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Lee la entrada del usuario para el Dominio, valida formato y unicidad (ciclo cerrado).
+     * Se usa para la creación de nuevos vehículos.
+     */
+    private String leerDominioYValidarUnicidad(String mensaje) {
+        String input;
+        while (true) {
+            System.out.print(mensaje);
+            input = scanner.nextLine().trim();
+            String dominioLimpio;
+            try {
+                // 1. Validar el formato (REGEX)
+                dominioLimpio = validarDominioFormato(input);
+                
+                // 2. Validar Unicidad (Regla de Negocio)
+                if (vehiculoService.buscarPorDominio(dominioLimpio) != null) {
+                    throw new IllegalArgumentException("ERROR DE UNICIDAD: Ya existe un vehiculo activo con la patente " + dominioLimpio + ".");
+                }
+                
+                return dominioLimpio;
+                
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error: " + e.getMessage());
+            } catch (Exception e) {
+                System.err.println("Error al verificar unicidad en la BD: " + e.getMessage());
+                // Si hay un error de conexión o BD, se recomienda abortar o reintentar
+                return ""; // Devuelve vacío para forzar la reentrada o abortar
+            }
+        }
+    }
+
+    /**
+     * Lee un String obligatorio, repite si está vacío (ciclo cerrado).
+     */
     private String leerString(String mensaje) {
         String input;
         while (true) {
@@ -284,58 +382,110 @@ public class MenuHandler {
         }
     }
     
+    /**
+     * Lee un String opcional (puede estar vacío).
+     */
     private String leerStringOpcional(String mensaje) {
         System.out.print(mensaje);
         return scanner.nextLine().trim();
     }
 
+    /**
+     * Lee un entero, valida que sea un número y que esté en el rango (ciclo cerrado).
+     */
     private int leerInt(String mensaje, int min, int max) {
         while (true) {
             try {
                 System.out.print(mensaje);
-                int input = scanner.nextInt();
-                scanner.nextLine(); // Consumir salto de linea
+                String inputStr = scanner.nextLine().trim();
+                
+                if (inputStr.isEmpty()) {
+                    System.err.println("Error: El campo no puede estar vacio.");
+                    continue; // Vuelve al inicio del while
+                }
+                
+                int input = Integer.parseInt(inputStr);
+
                 if (input < min || input > max) {
                     System.err.println("Error: El numero debe estar entre " + min + " y " + max + ".");
                 } else {
-                    return input;
+                    return input; // Sale del ciclo
                 }
-            } catch (InputMismatchException e) {
+            } catch (NumberFormatException e) {
                 System.err.println("Error: Debe ingresar un numero entero valido.");
-                scanner.nextLine(); // Limpiar buffer
             }
         }
     }
 
+    /**
+     * Lee una Cobertura (Enum), repite hasta que sea una opción válida (ciclo cerrado).
+     */
     private Cobertura leerCobertura() {
         while (true) {
             System.out.print("Cobertura (RC, TERCEROS, TODO_RIESGO): ");
             try {
                 String input = scanner.nextLine().trim().toUpperCase();
-                return Cobertura.valueOf(input);
+                return Cobertura.valueOf(input); // Valida que el String corresponda al Enum
             } catch (IllegalArgumentException e) {
                 System.err.println("Error: Valor no valido. Use una de las opciones.");
             }
         }
     }
 
+    /**
+     * Lee una fecha, valida el formato y que no sea anterior a hoy (ciclo cerrado).
+     */
     private LocalDate leerFecha(String mensaje) {
         while (true) {
             System.out.print(mensaje);
             try {
                 String input = scanner.nextLine().trim();
+                if (input.isEmpty()) {
+                    System.err.println("Error: La fecha no puede estar vacia.");
+                    continue;
+                }
+                
                 LocalDate fecha = LocalDate.parse(input);
                 
                 if (fecha.isBefore(LocalDate.now())) {
                     System.err.println("Error: La fecha no puede ser anterior a hoy.");
                 } else {
-                    return fecha;
+                    return fecha; // Sale del ciclo
                 }
             } catch (DateTimeParseException e) {
                 System.err.println("Error: Formato de fecha invalido. Use YYYY-MM-DD.");
             }
         }
     }
+    
+    /**
+     * Lee una fecha OPCIONAL, valida el formato si se ingresa un valor.
+     * @return La fecha si es válida, o null si el campo se dejó vacío.
+     */
+    private LocalDate leerFechaOpcional(String mensaje) {
+         while (true) {
+            System.out.print(mensaje);
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) {
+                return null; // Acepta el valor vacío y sale
+            }
+            try {
+                LocalDate fecha = LocalDate.parse(input);
+                
+                if (fecha.isBefore(LocalDate.now())) {
+                    System.err.println("Error: La fecha no puede ser anterior a hoy.");
+                } else {
+                    return fecha; // Sale del ciclo
+                }
+            } catch (DateTimeParseException e) {
+                System.err.println("Error: Formato de fecha invalido. Use YYYY-MM-DD.");
+            }
+        }
+    }
+    
+    // =================================================================
+    // MÉTODOS DE IMPRESIÓN Y UTILIDAD
+    // =================================================================
     
     private void imprimirVehiculoFormatoCuadro(Vehiculo v) {
         System.out.println("----------------------------------------");
