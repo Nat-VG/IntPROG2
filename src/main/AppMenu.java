@@ -10,26 +10,25 @@ import java.util.Scanner;
 
 /**
  * Orquestador principal del menu de la aplicacion (Punto de entrada).
- * CORREGIDO: 
- * 1. Mensajes de error sin acentos.
- * 2. El loop 'run()' ahora llama a 'pausarParaContinuar()' despues
- * de CADA operacion para mejorar la experiencia de usuario.
  */
 public class AppMenu {
 
     private final Scanner scanner;
     private final MenuHandler menuHandler;
     // 'running' ya no es necesario, el loop se controla con 'opcion != 0'
-    // private boolean running; // <-- ELIMINADO
 
     public AppMenu() {
         this.scanner = new Scanner(System.in);
         
-        // --- INYECCIÓN DE DEPENDENCIAS ---
+        // --- INYECCIÓN DE DEPENDENCIAS (Configuración de capas) ---
         SeguroVehicularDAO seguroDAO = new SeguroVehicularDAO();
         VehiculoDAO vehiculoDAO = new VehiculoDAO(seguroDAO);
+        
+        // El Service de Seguro se necesita para el Service de Vehiculo
         SeguroVehicularServiceImpl seguroService = new SeguroVehicularServiceImpl(seguroDAO);
         VehiculoServiceImpl vehiculoService = new VehiculoServiceImpl(vehiculoDAO, seguroService);
+        
+        // El Handler necesita el Scanner y los Services para operar
         this.menuHandler = new MenuHandler(scanner, vehiculoService, seguroService);
         // --- FIN INYECCIÓN ---
     }
@@ -40,48 +39,49 @@ public class AppMenu {
     }
 
     /**
-     * Loop principal del menu, modificado para pausar despues de cada accion.
+     * Ciclo principal del menu.
      */
     public void run() {
-        int opcion = -1; // Inicializamos con un valor que no sea 0
-        
-        while (opcion != 0) {
+        int opcion;
+        do {
             MenuDisplay.mostrarMenuPrincipal();
-            try {
-                opcion = scanner.nextInt();
-                scanner.nextLine(); // Consumir el salto de linea
-                
-                processOption(opcion); // Procesa la opcion
-                
-            } catch (InputMismatchException e) {
-                System.err.println("Error: Debe ingresar un numero.");
-                scanner.nextLine(); // Limpiar buffer del scanner
-                opcion = -1; // Resetea la opcion para que el loop no termine
+            opcion = readOption();
             
-            } catch (Exception e) {
-                // Captura MUY general por si algo mas falla (poco probable)
-                System.err.println("Error fatal en el menu: " + e.getMessage());
-                opcion = -1; // Resetea
-            }
-
-            // PAUSA GLOBAL:
-            // Si la opcion no fue "Salir" (0), pausamos la pantalla.
             if (opcion != 0) {
-                menuHandler.pausarParaContinuar();
+                processOption(opcion);
+                if (opcion >= 1 && opcion <= 11) { // Pausar solo si se ejecuta una opción válida
+                    menuHandler.pausarParaContinuar(); 
+                }
             }
-        }
+            
+        } while (opcion != 0);
         
-        System.out.println("Saliendo de la aplicacion...");
-        scanner.close();
+        System.out.println("\nCerrando la aplicacion. Hasta luego!");
+    }
+    
+    /**
+     * Lee la opción del usuario con manejo básico de errores de tipo.
+     * @return La opción elegida o -1 si hubo un error.
+     */
+    private int readOption() {
+        try {
+            int opcion = scanner.nextInt();
+            scanner.nextLine(); // Consumir el salto de linea
+            return opcion;
+        } catch (InputMismatchException e) {
+            System.err.println("Error: Ingrese un numero valido.");
+            scanner.nextLine(); // Limpiar el buffer
+            return -1;
+        }
     }
 
     /**
-     * Switch principal que delega la accion al MenuHandler.
-     * @param opcion La opcion seleccionada por el usuario.
+     * Ejecuta la lógica correspondiente a la opción seleccionada.
      */
     private void processOption(int opcion) {
         try {
             switch (opcion) {
+                // VEHICULOS (CRUD Compuesto A + B)
                 case 1:
                     menuHandler.crearVehiculoConSeguro();
                     break;
@@ -97,20 +97,28 @@ public class AppMenu {
                 case 5:
                     menuHandler.eliminarVehiculo();
                     break;
-                case 6:
+                // SEGUROS (CRUD Individual B)
+                case 6: // ✅ NUEVA POSICIÓN
+                    menuHandler.crearSeguroIndependiente(); 
+                    break;
+                case 7: // ✅ NUEVA POSICIÓN
+                    menuHandler.actualizarSeguroIndependiente(); 
+                    break;
+                case 8: // ✅ NUEVA POSICIÓN
+                    menuHandler.eliminarSeguroIndependiente(); 
+                    break;
+                case 9: // ✅ NUEVA POSICIÓN
+                    menuHandler.listarSeguros(); 
+                    break;
+                // BÚSQUEDAS POR CAMPO CLAVE
+                case 10: // ✅ NUEVA OPCIÓN
                     menuHandler.buscarVehiculoPorDominio();
                     break;
-                case 7:
+                case 11: // ✅ NUEVA OPCIÓN
                     menuHandler.buscarSeguroPorPoliza();
                     break;
-                case 8:
-                    menuHandler.crearSeguroIndependiente();
-                    break;
-                case 9:
-                    menuHandler.listarSeguros();
-                    break;
                 case 0:
-                    // La logica de salida ahora esta en el loop run()
+                    // La logica de salida esta en el loop run()
                     break;
                 default:
                     System.err.println("Opcion no valida. Intente de nuevo.");

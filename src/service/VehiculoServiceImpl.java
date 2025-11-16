@@ -37,70 +37,76 @@ public class VehiculoServiceImpl implements GenericService<Vehiculo> {
             throw new IllegalArgumentException("El numero de chasis es obligatorio.");
         }
     }
-
-    private void validarUnicidad(Vehiculo vehiculo, Connection conn) throws Exception {
-        if (vehiculoDAO.buscarPorCampoClave(vehiculo.getDominio().toUpperCase(), conn) != null) {
-            throw new IllegalArgumentException("El dominio '" + vehiculo.getDominio() + "' ya existe en el sistema.");
+    
+    public void validarUnicidad(String dominio) throws Exception {
+        if (vehiculoDAO.buscarPorCampoClave(dominio.toUpperCase(), null) != null) {
+            throw new IllegalArgumentException("Ya existe un vehiculo activo con el dominio: " + dominio);
         }
     }
-    
+
+    /**
+     * Inserta un Vehiculo y, opcionalmente, su Seguro asociado en una única transacción.
+     */
     @Override
     public void insertar(Vehiculo vehiculo) throws Exception {
         validar(vehiculo);
+        validarUnicidad(vehiculo.getDominio());
         
-        if (vehiculo.getSeguro() == null) {
-            throw new IllegalArgumentException("El vehiculo debe tener un seguro asociado para ser creado.");
+        // 1. Validar unicidad de la Poliza (si hay seguro) y otros campos de B
+        if (vehiculo.getSeguro() != null) {
+            seguroService.validar(vehiculo.getSeguro());
+            // Se debe validar la unicidad de la poliza DENTRO de la transaccion
+            // para evitar race conditions, pero por simplicidad se hace aqui con una conexion simple
+            // (el DAO que busca por clave ya usa su propia conexion).
+            seguroService.validarUnicidadPoliza(vehiculo.getSeguro().getNroPoliza(), null);
         }
-        
-        seguroService.validar(vehiculo.getSeguro());
 
         try (Connection conn = DatabaseConnection.getConnection();
              TransactionManager tm = new TransactionManager(conn)) {
 
             tm.startTransaction();
-            
-            validarUnicidad(vehiculo, tm.getConnection());
-            seguroService.validarUnicidadPoliza(vehiculo.getSeguro().getNroPoliza(), tm.getConnection());
-            
-            vehiculoDAO.insertarTx(vehiculo, tm.getConnection());
-            
-            long idVehiculoGenerado = vehiculo.getId();
-            SeguroVehicular seguro = vehiculo.getSeguro();
-            seguro.setIdVehiculo(idVehiculoGenerado);
-            
-            vehiculoDAO.seguroDAO.insertarTx(seguro, tm.getConnection());
+
+            // 2. Insertar Vehiculo (Clase A)
+            long vehiculoId = vehiculoDAO.insertarTx(vehiculo, tm.getConnection());
+            vehiculo.setId(vehiculoId); // Asegurar que el objeto tiene el ID generado
+
+            // 3. Insertar Seguro (Clase B) si existe
+            if (vehiculo.getSeguro() != null) {
+                SeguroVehicular seguro = vehiculo.getSeguro();
+                
+                // --- LLAMADA CORREGIDA: Pasar el ID del Vehiculo al DAO para la FK ---
+                long seguroId = vehiculoDAO.seguroDAO.insertarTx(seguro, vehiculoId, tm.getConnection());
+                seguro.setId(seguroId);
+            }
 
             tm.commit();
-            
+
         } catch (Exception e) {
-            System.err.println("La transaccion de insercion (Vehiculo/Seguro) fallo. Rollback asegurado.");
-            throw new Exception("Error en la transaccion: " + e.getMessage()); 
+            System.err.println("La transaccion de insercion fallo. Rollback asegurado.");
+            throw new Exception("Error en la transaccion: " + e.getMessage());
         }
     }
     
     @Override
-    public void actualizar(Vehiculo vehiculo) throws Exception { 
+    public void actualizar(Vehiculo vehiculo) throws Exception {
         validar(vehiculo);
         
         try (Connection conn = DatabaseConnection.getConnection();
              TransactionManager tm = new TransactionManager(conn)) {
 
             tm.startTransaction();
-            
+
+            // 1. Actualizar Vehiculo (A)
             vehiculoDAO.actualizarTx(vehiculo, tm.getConnection());
-            
+
+            // 2. Actualizar Seguro (B) si existe
             if (vehiculo.getSeguro() != null) {
-                SeguroVehicular seguro = vehiculo.getSeguro();
-                seguroService.validar(seguro);
-                
-                if (seguro.getId() == 0) {
-                     throw new IllegalArgumentException("No se puede crear un nuevo seguro en una actualizacion. La relacion 1:1 es fija.");
-                } else {
-                    vehiculoDAO.seguroDAO.actualizarTx(seguro, tm.getConnection());
-                }
+                seguroService.validar(vehiculo.getSeguro());
+                vehiculoDAO.seguroDAO.actualizarTx(vehiculo.getSeguro(), tm.getConnection());
             }
 
             tm.commit();
+
         } catch (Exception e) {
             System.err.println("La transaccion de actualizacion fallo. Rollback asegurado.");
             throw new Exception("Error en la transaccion: " + e.getMessage());
@@ -120,8 +126,10 @@ public class VehiculoServiceImpl implements GenericService<Vehiculo> {
 
             tm.startTransaction();
             
+            // 1. Baja logica de Vehiculo (A)
             vehiculoDAO.eliminarTx(id, tm.getConnection());
             
+            // 2. Baja logica de Seguro (B) si existe
             if (vehiculo.getSeguro() != null) {
                 int seguroId = (int) vehiculo.getSeguro().getId();
                 vehiculoDAO.seguroDAO.eliminarTx(seguroId, tm.getConnection());

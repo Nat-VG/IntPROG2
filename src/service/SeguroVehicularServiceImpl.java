@@ -40,31 +40,49 @@ public class SeguroVehicularServiceImpl implements GenericService<SeguroVehicula
     public SeguroVehicular buscarPorPoliza(String nroPoliza) throws Exception {
         return seguroDAO.buscarPorCampoClave(nroPoliza.toUpperCase(), null);
     }
-
-    @Override
-    public void insertar(SeguroVehicular seguro) throws Exception {
+    
+    // --- MÉTODOS ADAPTADOS PARA EL SERVICE (Versión CRUD simple) ---
+    
+    public void insertar(SeguroVehicular seguro, long idVehiculo) throws Exception {
         validar(seguro);
         
         try(Connection conn = DatabaseConnection.getConnection()) {
             validarUnicidadPoliza(seguro.getNroPoliza(), conn);
+            
+            if (idVehiculo <= 0) {
+                 throw new IllegalArgumentException("No se puede crear un seguro independiente sin un ID de Vehiculo.");
+            }
+            
+            // Usamos el DAO transaccional, pero manejamos la conexión aquí (no es una transacción compleja)
+            seguroDAO.insertarTx(seguro, idVehiculo, conn);
         }
-        
-        if (seguro.getIdVehiculo() <= 0) {
-             throw new IllegalArgumentException("No se puede crear un seguro independiente sin un ID de Vehiculo (debido a la FK NOT NULL).");
-        }
-        
-        seguroDAO.insertar(seguro);
     }
-
+    
+    @Override
+    public void insertar(SeguroVehicular seguro) throws Exception {
+        throw new UnsupportedOperationException("Use el metodo insertar(SeguroVehicular, long idVehiculo) para manejar la FK.");
+    }
+    
     @Override
     public void actualizar(SeguroVehicular seguro) throws Exception {
         validar(seguro);
-        seguroDAO.actualizar(seguro);
+        
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // Reutilizamos el método transaccional del DAO, abriendo y cerrando la conexión aquí.
+            seguroDAO.actualizarTx(seguro, conn);
+        }
     }
     
     @Override
     public void eliminar(int id) throws Exception {
-        seguroDAO.eliminar(id);
+        if (seguroDAO.getById(id) == null) {
+            throw new Exception("Seguro con ID " + id + " no encontrado o ya eliminado.");
+        }
+        
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // Reutilizamos el método transaccional del DAO, abriendo y cerrando la conexión aquí.
+            seguroDAO.eliminarTx(id, conn);
+        }
     }
 
     @Override

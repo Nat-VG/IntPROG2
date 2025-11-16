@@ -4,8 +4,8 @@ import java.time.LocalDate;
 
 /**
  * Clase SeguroVehicular (Clase B).
- * Esta versión incluye el campo 'idVehiculo' necesario para
- * que el DAO inserte la Clave Foránea (FK) correctamente.
+ * CORREGIDA: Se elimina el campo 'idVehiculo' para garantizar
+ * la unidireccionalidad pura (A -> B).
  */
 public class SeguroVehicular extends Base {
     
@@ -14,11 +14,8 @@ public class SeguroVehicular extends Base {
     private Cobertura cobertura;
     private LocalDate vencimiento;
     
-    /**
-     * Campo para almacenar la FK (id del Vehículo) temporalmente
-     * antes de la inserción en el DAO.
-     */
-    private long idVehiculo;
+    // ELIMINADO: private long idVehiculo; 
+    // La FK se maneja solo en la capa DAO/Service
 
     public SeguroVehicular() {}
 
@@ -62,24 +59,13 @@ public class SeguroVehicular extends Base {
 
     /**
      * Setter para el vencimiento (LocalDate).
-     * Este es el método que tu DAO está buscando.
      * @param vencimiento La fecha de vencimiento.
      */
     public void setVencimiento(LocalDate vencimiento) {
         this.vencimiento = vencimiento;
     }
 
-    /**
-     * Getter/Setter para la FK (idVehiculo).
-     * Esto soluciona el error de INSERT.
-     */
-    public long getIdVehiculo() {
-        return idVehiculo;
-    }
-
-    public void setIdVehiculo(long idVehiculo) {
-        this.idVehiculo = idVehiculo;
-    }
+    // ELIMINADOS: getIdVehiculo(), setIdVehiculo()
 
     @Override
     public String toString() {
@@ -89,7 +75,6 @@ public class SeguroVehicular extends Base {
                 ", nroPoliza='" + nroPoliza + '\'' +
                 ", cobertura=" + cobertura +
                 ", vencimiento=" + vencimiento +
-                ", idVehiculo=" + idVehiculo + // Mostramos la FK
                 ", eliminado=" + isEliminado() +
                 '}';
     }
