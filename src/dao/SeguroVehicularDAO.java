@@ -9,14 +9,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * DAO para SeguroVehicular (Clase B).
- * Corregido para manejar la inserción de la FK 'idVehiculo'
- * desde el objeto SeguroVehicular.
- */
 public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
     
-    // CORREGIDO: El INSERT_SQL incluye 'idVehiculo'
     private static final String INSERT_SQL = 
         "INSERT INTO segurovehicular (aseguradora, nroPoliza, cobertura, vencimiento, idVehiculo) VALUES (?, ?, ?, ?, ?)";
     
@@ -34,16 +28,12 @@ public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
     
     private static final String SELECT_BY_POLIZA_SQL = 
         "SELECT * FROM segurovehicular WHERE nroPoliza = ? AND eliminado = FALSE";
-
-    // =================================================================
-    // MÉTODOS TRANSACCIONALES (Usan la Connection conn externa)
-    // =================================================================
+    
     
     @Override
     public long insertarTx(SeguroVehicular seguro, Connection conn) throws Exception {
         try (PreparedStatement stmt = conn.prepareStatement(INSERT_SQL, Statement.RETURN_GENERATED_KEYS)) {
             
-            // Llama al método auxiliar corregido
             setSeguroParameters(stmt, seguro);
             
             stmt.executeUpdate();
@@ -54,7 +44,7 @@ public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
                     seguro.setId(generatedId);
                     return generatedId;
                 } else {
-                    throw new SQLException("La inserción de Seguro falló, no se obtuvo ID generado.");
+                    throw new SQLException("La insercion de Seguro fallo, no se obtuvo ID generado.");
                 }
             }
         }
@@ -63,12 +53,11 @@ public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
     @Override
     public void actualizarTx(SeguroVehicular seguro, Connection conn) throws Exception {
         try (PreparedStatement stmt = conn.prepareStatement(UPDATE_SQL)) {
-            // Llama al seteo de parámetros (sin FK)
             stmt.setString(1, seguro.getAseguradora());
             stmt.setString(2, seguro.getNroPoliza().toUpperCase());
             stmt.setString(3, seguro.getCobertura().name());
             stmt.setDate(4, Date.valueOf(seguro.getVencimiento()));
-            stmt.setLong(5, seguro.getId()); // WHERE id = ?
+            stmt.setLong(5, seguro.getId());
             stmt.executeUpdate();
         }
     }
@@ -106,13 +95,8 @@ public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
         return null;
     }
 
-    // =================================================================
-    // MÉTODOS SIN TRANSACCIÓN (Manejan su propia Connection)
-    // =================================================================
-
     @Override
     public void insertar(SeguroVehicular entidad) throws Exception {
-        // Esta versión (no transaccional) requiere que el idVehiculo ya esté seteado
         try (Connection conn = DatabaseConnection.getConnection()) {
             insertarTx(entidad, conn);
         }
@@ -160,34 +144,18 @@ public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
         return seguros;
     }
     
-    // --- MÉTODOS AUXILIARES ---
-    
-    /**
-     * Setea los parámetros del Seguro en un PreparedStatement (para INSERT).
-     * CORREGIDO: Usa seguro.getIdVehiculo() para setear la FK.
-     * @param stmt El PreparedStatement a configurar.
-     * @param seguro El objeto con los datos (debe tener idVehiculo seteado).
-     * @throws SQLException Si falla el seteo o idVehiculo no es válido.
-     */
     private void setSeguroParameters(PreparedStatement stmt, SeguroVehicular seguro) throws SQLException {
         stmt.setString(1, seguro.getAseguradora());
         stmt.setString(2, seguro.getNroPoliza().toUpperCase());
-        stmt.setString(3, seguro.getCobertura().name()); // Convertimos enum a string
+        stmt.setString(3, seguro.getCobertura().name());
         stmt.setDate(4, Date.valueOf(seguro.getVencimiento()));
         
-        // CORRECCIÓN CRÍTICA:
         if (seguro.getIdVehiculo() <= 0) {
-            throw new SQLException("Error de lógica (DAO): Intentando insertar un seguro sin un ID de Vehículo válido.");
+            throw new SQLException("Error de logica (DAO): Intentando insertar un seguro sin un ID de Vehiculo valido.");
         }
-        stmt.setLong(5, seguro.getIdVehiculo()); // <-- Se usa la FK
+        stmt.setLong(5, seguro.getIdVehiculo());
     }
 
-    /**
-     * Mapea una fila de ResultSet a un objeto SeguroVehicular.
-     * @param rs El ResultSet posicionado en la fila a mapear.
-     * @return El objeto SeguroVehicular.
-     * @throws SQLException Si falla la lectura del ResultSet.
-     */
     private SeguroVehicular mapearResultSetASeguro(ResultSet rs) throws SQLException {
         SeguroVehicular seguro = new SeguroVehicular();
         seguro.setId(rs.getLong("id"));
@@ -195,7 +163,7 @@ public class SeguroVehicularDAO implements GenericDAO<SeguroVehicular> {
         seguro.setAseguradora(rs.getString("aseguradora"));
         seguro.setNroPoliza(rs.getString("nroPoliza"));
         seguro.setCobertura(Cobertura.valueOf(rs.getString("cobertura")));
-        seguro.setIdVehiculo(rs.getLong("idVehiculo")); // Carga la FK
+        seguro.setIdVehiculo(rs.getLong("idVehiculo"));
         
         Date vencimientoDate = rs.getDate("vencimiento");
         if (vencimientoDate != null) {

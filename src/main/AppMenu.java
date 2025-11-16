@@ -1,6 +1,5 @@
 package main;
 
-// Importamos las clases de las otras capas
 import dao.SeguroVehicularDAO;
 import dao.VehiculoDAO;
 import service.SeguroVehicularServiceImpl;
@@ -10,85 +9,75 @@ import java.util.InputMismatchException;
 import java.util.Scanner;
 
 /**
- * Orquestador principal del menú de la aplicación (Punto de entrada).
- * Responsabilidades:
- * 1. Inicializar la cadena de dependencias (DI manual).
- * 2. Ejecutar el loop principal del menú.
- * 3. Delegar la lógica de interacción a MenuHandler.
- * Adaptado del ejemplo AppMenu.java del TPI.
- *
- * @author [Tu Nombre/Grupo Aquí]
+ * Orquestador principal del menu de la aplicacion (Punto de entrada).
+ * CORREGIDO: 
+ * 1. Mensajes de error sin acentos.
+ * 2. El loop 'run()' ahora llama a 'pausarParaContinuar()' despues
+ * de CADA operacion para mejorar la experiencia de usuario.
  */
 public class AppMenu {
 
     private final Scanner scanner;
     private final MenuHandler menuHandler;
-    private boolean running;
+    // 'running' ya no es necesario, el loop se controla con 'opcion != 0'
+    // private boolean running; // <-- ELIMINADO
 
-    /**
-     * Constructor que inicializa la aplicación y la cadena de dependencias (DI).
-     * Aquí se "enciende" la aplicación y se ensamblan todas las capas.
-     */
     public AppMenu() {
         this.scanner = new Scanner(System.in);
         
-        // =================================================================
-        // INYECCIÓN DE DEPENDENCIAS (DI) - Ensamblado de la aplicación
-        // =================================================================
-        
-        // 1. Crear DAOs (Capa más baja)
-        // El DAO de Seguro (B) no depende de nadie
+        // --- INYECCIÓN DE DEPENDENCIAS ---
         SeguroVehicularDAO seguroDAO = new SeguroVehicularDAO();
-        // El DAO de Vehículo (A) depende del DAO de Seguro (B)
         VehiculoDAO vehiculoDAO = new VehiculoDAO(seguroDAO);
-
-        // 2. Crear Services (Capa de negocio)
-        // El Service de Seguro (B) depende de su DAO (B)
         SeguroVehicularServiceImpl seguroService = new SeguroVehicularServiceImpl(seguroDAO);
-        // El Service de Vehículo (A) depende de su DAO (A) y del Service de B
         VehiculoServiceImpl vehiculoService = new VehiculoServiceImpl(vehiculoDAO, seguroService);
-        
-        // 3. Crear el Handler (Capa de presentación)
-        // El Handler necesita ambos services para operar (A y B)
         this.menuHandler = new MenuHandler(scanner, vehiculoService, seguroService);
-        
-        // =================================================================
-        
-        this.running = true;
+        // --- FIN INYECCIÓN ---
     }
 
-    /**
-     * Punto de entrada de la aplicación (main).
-     * @param args Argumentos de línea de comandos (no usados).
-     */
     public static void main(String[] args) {
         AppMenu app = new AppMenu();
         app.run();
     }
 
     /**
-     * Loop principal del menú.
-     * Se ejecuta hasta que el usuario elija la opción 0.
+     * Loop principal del menu, modificado para pausar despues de cada accion.
      */
     public void run() {
-        while (running) {
+        int opcion = -1; // Inicializamos con un valor que no sea 0
+        
+        while (opcion != 0) {
             MenuDisplay.mostrarMenuPrincipal();
             try {
-                int opcion = scanner.nextInt();
-                scanner.nextLine(); // Consumir el salto de línea (CRÍTICO)
-                processOption(opcion);
+                opcion = scanner.nextInt();
+                scanner.nextLine(); // Consumir el salto de linea
+                
+                processOption(opcion); // Procesa la opcion
+                
             } catch (InputMismatchException e) {
-                System.err.println("Error: Debe ingresar un número.");
+                System.err.println("Error: Debe ingresar un numero.");
                 scanner.nextLine(); // Limpiar buffer del scanner
+                opcion = -1; // Resetea la opcion para que el loop no termine
+            
+            } catch (Exception e) {
+                // Captura MUY general por si algo mas falla (poco probable)
+                System.err.println("Error fatal en el menu: " + e.getMessage());
+                opcion = -1; // Resetea
+            }
+
+            // PAUSA GLOBAL:
+            // Si la opcion no fue "Salir" (0), pausamos la pantalla.
+            if (opcion != 0) {
+                menuHandler.pausarParaContinuar();
             }
         }
-        System.out.println("Saliendo de la aplicación...");
+        
+        System.out.println("Saliendo de la aplicacion...");
         scanner.close();
     }
 
     /**
-     * Switch principal que delega la acción al MenuHandler.
-     * @param opcion La opción seleccionada por el usuario.
+     * Switch principal que delega la accion al MenuHandler.
+     * @param opcion La opcion seleccionada por el usuario.
      */
     private void processOption(int opcion) {
         try {
@@ -121,17 +110,15 @@ public class AppMenu {
                     menuHandler.listarSeguros();
                     break;
                 case 0:
-                    running = false;
+                    // La logica de salida ahora esta en el loop run()
                     break;
                 default:
-                    System.err.println("Opción no válida. Intente de nuevo.");
+                    System.err.println("Opcion no valida. Intente de nuevo.");
             }
         } catch (Exception e) {
-            // Captura genérica de errores de la capa Service (Rollbacks)
+            // Captura generica de errores de la capa Service (Rollbacks)
             System.err.println("\n!!! ERROR INESPERADO (CAPA MAIN): " + e.getMessage());
             // e.printStackTrace(); // Descomentar para debug
         }
     }
-    
-
 }

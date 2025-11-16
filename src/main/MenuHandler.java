@@ -13,9 +13,10 @@ import java.util.List;
 import java.util.Scanner;
 
 /**
- * Controlador de las operaciones del menú (Menu Handler).
- * CORREGIDO: Añade una pausa (presione Enter) después de las
- * operaciones de listado y búsqueda para mejorar la legibilidad.
+ * Controlador de las operaciones del menu (Menu Handler).
+ * CORREGIDO: 
+ * 1. Se eliminaron todos los acentos de los mensajes.
+ * 2. Se anadio un metodo publico 'pausarParaContinuar()'.
  */
 public class MenuHandler {
     
@@ -23,12 +24,6 @@ public class MenuHandler {
     private final VehiculoServiceImpl vehiculoService;
     private final SeguroVehicularServiceImpl seguroService;
 
-    /**
-     * Constructor con Inyección de Dependencias.
-     * @param scanner El Scanner global (desde AppMenu).
-     * @param vehiculoService El Service principal (A).
-     * @param seguroService El Service secundario (B).
-     */
     public MenuHandler(Scanner scanner, VehiculoServiceImpl vehiculoService, SeguroVehicularServiceImpl seguroService) {
         this.scanner = scanner;
         this.vehiculoService = vehiculoService;
@@ -36,209 +31,168 @@ public class MenuHandler {
     }
 
     // =================================================================
-    // MÉTODOS DE INTERACCIÓN (Llamados por AppMenu)
+    // MÉTODOS DE INTERACCION (Llamados por AppMenu)
     // =================================================================
 
-    /**
-     * Opción 1: Crea Vehiculo y Seguro (Transacción Atómica 1:1).
-     */
     public void crearVehiculoConSeguro() {
         try {
-            System.out.println("\n--- 1. Crear Vehículo (Transaccional) ---");
-            // ... (Lógica de carga de datos A y B) ...
+            System.out.println("\n--- 1. Crear Vehiculo (Transaccional) ---");
             String dominio = leerString("Dominio (Patente): ");
             String marca = leerString("Marca: ");
             String modelo = leerString("Modelo: ");
-            int anio = leerInt("Año (ej. 2024): ", 1950, LocalDate.now().getYear() + 1);
+            int anio = leerInt("Ano (ej. 2024): ", 1950, LocalDate.now().getYear() + 1);
             String nroChasis = leerString("Nro. Chasis: ");
+            
             Vehiculo vehiculo = new Vehiculo(0, false, dominio, marca, modelo, anio, nroChasis);
             
             System.out.println("--- Datos del Seguro (Requerido) ---");
             String aseguradora = leerString("Aseguradora: ");
-            String nroPoliza = leerString("Nro. Póliza: ");
+            String nroPoliza = leerString("Nro. Poliza: ");
             Cobertura cobertura = leerCobertura();
             LocalDate vencimiento = leerFecha("Fecha Vencimiento (YYYY-MM-DD): ");
+            
             SeguroVehicular seguro = new SeguroVehicular(0, false, aseguradora, nroPoliza, cobertura, vencimiento);
             
             vehiculo.setSeguro(seguro);
             
-            // Llamada al Service (que maneja la Tx A->B)
             vehiculoService.insertar(vehiculo);
             
             System.out.println("-----------------------------------------------------");
-            System.out.println("ÉXITO: Vehículo y Seguro creados (Transacción OK).");
-            System.out.println("ID Vehículo: " + vehiculo.getId() + " | ID Seguro: " + vehiculo.getSeguro().getId());
+            System.out.println("EXITO: Vehiculo y Seguro creados (Transaccion OK).");
+            System.out.println("ID Vehiculo: " + vehiculo.getId() + " | ID Seguro: " + vehiculo.getSeguro().getId());
             System.out.println("-----------------------------------------------------");
 
         } catch (Exception e) {
             System.err.println("\nERROR AL CREAR (Rollback ejecutado): " + e.getMessage());
         }
-        
-        // (No pausamos en crear, el mensaje de Éxito/Error es suficiente)
     }
 
-    /**
-     * Opción 2: Lista todos los vehículos (Demuestra Eager Loading 1:1).
-     * @throws Exception Si falla la consulta al Service/DAO.
-     */
     public void listarVehiculos() throws Exception {
-        System.out.println("\n--- 2. Listar Vehículos (con Seguros) ---");
+        System.out.println("\n--- 2. Listar Vehiculos (con Seguros) ---");
         List<Vehiculo> vehiculos = vehiculoService.getAll();
         
         if (vehiculos.isEmpty()) {
-            System.out.println("No hay vehículos activos en el sistema.");
-        } else {
-            for (Vehiculo v : vehiculos) {
-                System.out.println(v.toString());
-                System.out.println("--------------------");
-            }
+            System.out.println("No hay vehiculos activos en el sistema.");
+            return;
         }
         
-        // AÑADIMOS LA PAUSA
-        pausarParaContinuar();
+        for (Vehiculo v : vehiculos) {
+            System.out.println(v.toString());
+            System.out.println("--------------------");
+        }
     }
 
-    /**
-     * Opción 3: Buscar Vehículo por ID (Demuestra Eager Loading 1:1).
-     * @throws Exception Si falla la consulta al Service/DAO.
-     */
     public void buscarVehiculoPorId() throws Exception {
-        System.out.println("\n--- 3. Buscar Vehículo por ID ---");
-        int id = leerInt("Ingrese ID del Vehículo: ", 1, Integer.MAX_VALUE);
+        System.out.println("\n--- 3. Buscar Vehiculo por ID ---");
+        int id = leerInt("Ingrese ID del Vehiculo: ", 1, Integer.MAX_VALUE);
         
         Vehiculo v = vehiculoService.getById(id);
         
         if (v == null) {
-            System.err.println("Vehículo con ID " + id + " no encontrado o está eliminado.");
-        } else {
-            System.out.println("\nVehículo encontrado:");
-            imprimirVehiculoFormatoCuadro(v); // Usamos el formato de cuadro
+            System.err.println("Vehiculo con ID " + id + " no encontrado o esta eliminado.");
+            return;
         }
         
-        // AÑADIMOS LA PAUSA
-        pausarParaContinuar();
+        System.out.println("\nVehiculo encontrado:");
+        imprimirVehiculoFormatoCuadro(v);
     }
     
-    /**
-     * Opción 4: Actualizar Vehículo (Demuestra Tx 1:1).
-     */
     public void actualizarVehiculo() {
-         System.out.println("\n--- 4. Actualizar Vehículo (Transaccional) ---");
+         System.out.println("\n--- 4. Actualizar Vehiculo (Transaccional) ---");
          try {
-            int id = leerInt("Ingrese ID del Vehículo a actualizar: ", 1, Integer.MAX_VALUE);
+            int id = leerInt("Ingrese ID del Vehiculo a actualizar: ", 1, Integer.MAX_VALUE);
             Vehiculo v = vehiculoService.getById(id);
             
             if (v == null) {
-                System.err.println("Vehículo no encontrado.");
-                return; // Salimos (no pausamos si no se encontró)
+                System.err.println("Vehiculo no encontrado.");
+                return;
             }
             
-            // ... (Lógica de carga de datos para actualizar) ...
-            System.out.println("Datos actuales: Modelo=" + v.getModelo() + ", Año=" + v.getAnio());
-            String nuevoModelo = leerStringOpcional("Nuevo Modelo (Dejar vacío para no cambiar): ");
-            // ... (etc) ...
+            System.out.println("Datos actuales: Modelo=" + v.getModelo() + ", Ano=" + v.getAnio());
+            String nuevoModelo = leerStringOpcional("Nuevo Modelo (Dejar vacio para no cambiar): ");
+            String nuevoAnioStr = leerStringOpcional("Nuevo Ano (Dejar vacio para no cambiar): ");
             
             if (!nuevoModelo.isEmpty()) v.setModelo(nuevoModelo);
-            // ...
+            if (!nuevoAnioStr.isEmpty()) v.setAnio(Integer.parseInt(nuevoAnioStr));
             
             if (v.getSeguro() != null) {
-                 String nuevaPoliza = leerStringOpcional("Nueva Póliza (Dejar vacío para no cambiar): ");
-                 if (!nuevaPoliza.isEmpty()) v.getSeguro().setNroPoliza(nuevaPoliza);
+                System.out.println("Datos actuales Seguro: Poliza=" + v.getSeguro().getNroPoliza());
+                String nuevaPoliza = leerStringOpcional("Nueva Poliza (Dejar vacio para no cambiar): ");
+                if (!nuevaPoliza.isEmpty()) v.getSeguro().setNroPoliza(nuevaPoliza);
+            } else {
+                 System.out.println("Este vehiculo no tiene un seguro activo para actualizar.");
             }
             
             vehiculoService.actualizar(v);
-            System.out.println("ÉXITO: Vehículo actualizado (Transacción OK).");
+            System.out.println("EXITO: Vehiculo actualizado (Transaccion OK).");
 
          } catch (Exception e) {
              System.err.println("\nERROR AL ACTUALIZAR (Rollback ejecutado): " + e.getMessage());
          }
     }
 
-    /**
-     * Opción 5: Eliminar Vehículo (Baja Lógica Transaccional 1:1).
-     */
     public void eliminarVehiculo() {
-        System.out.println("\n--- 5. Eliminar Vehículo (Baja Lógica Tx) ---");
+        System.out.println("\n--- 5. Eliminar Vehiculo (Baja Logica Tx) ---");
         try {
-            int id = leerInt("Ingrese ID del Vehículo a eliminar: ", 1, Integer.MAX_VALUE);
+            int id = leerInt("Ingrese ID del Vehiculo a eliminar: ", 1, Integer.MAX_VALUE);
             
             vehiculoService.eliminar(id);
             
-            System.out.println("ÉXITO: Vehículo y su seguro asociado han sido dados de baja (Transacción OK).");
+            System.out.println("EXITO: Vehiculo y su seguro asociado han sido dados de baja (Transaccion OK).");
             
         } catch (Exception e) {
             System.err.println("\nERROR AL ELIMINAR (Rollback ejecutado): " + e.getMessage());
         }
     }
 
-    /**
-     * Opción 6: Búsqueda por Dominio (Requisito TPI).
-     * @throws Exception Si falla la consulta al Service/DAO.
-     */
     public void buscarVehiculoPorDominio() throws Exception {
-        System.out.println("\n--- 6. Buscar Vehículo por Dominio ---");
+        System.out.println("\n--- 6. Buscar Vehiculo por Dominio ---");
         String dominio = leerString("Ingrese Dominio (Patente): ");
         
         Vehiculo v = vehiculoService.buscarPorDominio(dominio);
         
         if (v == null) {
-            System.err.println("No se encontró vehículo activo con el dominio: " + dominio);
-        } else {
-            System.out.println("\nVehículo encontrado:");
-            // Usamos el formato de cuadro aquí también para consistencia
-            imprimirVehiculoFormatoCuadro(v);
+            System.err.println("No se encontro vehiculo activo con el dominio: " + dominio);
+            return;
         }
         
-        // AÑADIMOS LA PAUSA
-        pausarParaContinuar();
+        System.out.println("\nVehiculo encontrado:");
+        imprimirVehiculoFormatoCuadro(v);
     }
 
-    /**
-     * Opción 7: Búsqueda por Póliza (Requisito TPI).
-     * @throws Exception Si falla la consulta al Service/DAO.
-     */
     public void buscarSeguroPorPoliza() throws Exception {
-        System.out.println("\n--- 7. Buscar Seguro por Nro. Póliza ---");
-        String poliza = leerString("Ingrese Nro. Póliza: ");
+        System.out.println("\n--- 7. Buscar Seguro por Nro. Poliza ---");
+        String poliza = leerString("Ingrese Nro. Poliza: ");
         
         SeguroVehicular s = seguroService.buscarPorPoliza(poliza);
         
         if (s == null) {
-            System.err.println("No se encontró seguro activo con la póliza: " + poliza);
-        } else {
-            System.out.println("\nSeguro encontrado:");
-            // (Podríamos hacer un "imprimirSeguroFormatoCuadro" similar, 
-            // pero por ahora el toString() de Seguro es suficiente)
-            System.out.println(s.toString());
+            System.err.println("No se encontro seguro activo con la poliza: " + poliza);
+            return;
         }
         
-        // AÑADIMOS LA PAUSA
-        pausarParaContinuar();
+        System.out.println("\nSeguro encontrado:");
+        System.out.println(s.toString());
     }
 
-    /**
-     * Opción 8: Crear Seguro independiente (sin Tx 1:1).
-     */
     public void crearSeguroIndependiente() {
         try {
             System.out.println("\n--- 8. Crear Seguro (Independiente) ---");
             System.out.println("NOTA: Para que esto funcione, la FK 'idVehiculo' en la BD debe ser NOT NULL.");
-            int idVehiculo = leerInt("Ingrese el ID del Vehículo al que pertenecerá: ", 1, Integer.MAX_VALUE);
+            int idVehiculo = leerInt("Ingrese el ID del Vehiculo al que pertenecera: ", 1, Integer.MAX_VALUE);
             
-            // ... (Lógica de validación de Vehículo) ...
             Vehiculo v = vehiculoService.getById(idVehiculo);
             if (v == null) {
-                 System.err.println("Error: No existe ningún vehículo activo con ID: " + idVehiculo);
+                 System.err.println("Error: No existe ningun vehiculo activo con ID: " + idVehiculo);
                  return;
             }
             if (v.getSeguro() != null) {
-                 System.err.println("Error: El vehículo con ID " + idVehiculo + " ya tiene un seguro asociado.");
+                 System.err.println("Error: El vehiculo con ID " + idVehiculo + " ya tiene un seguro asociado (Poliza " + v.getSeguro().getNroPoliza() + ").");
                  return;
             }
             
-            // ... (Lógica de carga de datos de Seguro) ...
             String aseguradora = leerString("Aseguradora: ");
-            String nroPoliza = leerString("Nro. Póliza: ");
+            String nroPoliza = leerString("Nro. Poliza: ");
             Cobertura cobertura = leerCobertura();
             LocalDate vencimiento = leerFecha("Fecha Vencimiento (YYYY-MM-DD): ");
             
@@ -247,17 +201,13 @@ public class MenuHandler {
             
             seguroService.insertar(seguro);
             
-            System.out.println("ÉXITO: Seguro independiente creado con ID: " + seguro.getId());
+            System.out.println("EXITO: Seguro independiente creado con ID: " + seguro.getId());
 
         } catch (Exception e) {
             System.err.println("\nERROR AL CREAR SEGURO: " + e.getMessage());
         }
     }
 
-    /**
-     * Opción 9: Listar Seguros independientes.
-     * @throws Exception Si falla la consulta al Service/DAO.
-     */
     public void listarSeguros() throws Exception {
          System.out.println("\n--- 9. Listar Seguros ---");
          
@@ -265,19 +215,17 @@ public class MenuHandler {
         
         if (seguros.isEmpty()) {
             System.out.println("No hay seguros activos en el sistema.");
-        } else {
-            for (SeguroVehicular s : seguros) {
-                System.out.println(s.toString());
-                System.out.println("--------------------");
-            }
+            return;
         }
         
-        // AÑADIMOS LA PAUSA
-        pausarParaContinuar();
+        for (SeguroVehicular s : seguros) {
+            System.out.println(s.toString());
+            System.out.println("--------------------");
+        }
     }
 
     // =================================================================
-    // MÉTODOS AUXILIARES DE CAPTURA (Validación de entrada)
+    // MÉTODOS AUXILIARES DE CAPTURA (Validacion de entrada)
     // =================================================================
 
     private String leerString(String mensaje) {
@@ -286,7 +234,7 @@ public class MenuHandler {
             System.out.print(mensaje);
             input = scanner.nextLine().trim();
             if (input.isEmpty()) {
-                System.err.println("Error: El campo no puede estar vacío.");
+                System.err.println("Error: El campo no puede estar vacio.");
             } else {
                 return input;
             }
@@ -303,14 +251,14 @@ public class MenuHandler {
             try {
                 System.out.print(mensaje);
                 int input = scanner.nextInt();
-                scanner.nextLine(); // Consumir salto de línea
+                scanner.nextLine(); // Consumir salto de linea
                 if (input < min || input > max) {
-                    System.err.println("Error: El número debe estar entre " + min + " y " + max + ".");
+                    System.err.println("Error: El numero debe estar entre " + min + " y " + max + ".");
                 } else {
                     return input;
                 }
             } catch (InputMismatchException e) {
-                System.err.println("Error: Debe ingresar un número entero válido.");
+                System.err.println("Error: Debe ingresar un numero entero valido.");
                 scanner.nextLine(); // Limpiar buffer
             }
         }
@@ -321,9 +269,9 @@ public class MenuHandler {
             System.out.print("Cobertura (RC, TERCEROS, TODO_RIESGO): ");
             try {
                 String input = scanner.nextLine().trim().toUpperCase();
-                return Cobertura.valueOf(input); // Convierte String a Enum
+                return Cobertura.valueOf(input);
             } catch (IllegalArgumentException e) {
-                System.err.println("Error: Valor no válido. Use una de las opciones.");
+                System.err.println("Error: Valor no valido. Use una de las opciones.");
             }
         }
     }
@@ -333,7 +281,7 @@ public class MenuHandler {
             System.out.print(mensaje);
             try {
                 String input = scanner.nextLine().trim();
-                LocalDate fecha = LocalDate.parse(input); // Espera YYYY-MM-DD
+                LocalDate fecha = LocalDate.parse(input);
                 
                 if (fecha.isBefore(LocalDate.now())) {
                     System.err.println("Error: La fecha no puede ser anterior a hoy.");
@@ -341,28 +289,24 @@ public class MenuHandler {
                     return fecha;
                 }
             } catch (DateTimeParseException e) {
-                System.err.println("Error: Formato de fecha inválido. Use YYYY-MM-DD.");
+                System.err.println("Error: Formato de fecha invalido. Use YYYY-MM-DD.");
             }
         }
     }
     
     // =================================================================
-    // MÉTODOS AUXILIARES DE IMPRESIÓN (Añadidos por solicitud)
+    // MÉTODOS AUXILIARES DE IMPRESION Y PAUSA
     // =================================================================
 
-    /**
-     * MÉTODO NUEVO: Imprime un vehículo con formato de cuadro.
-     * @param v El Vehiculo a imprimir.
-     */
     private void imprimirVehiculoFormatoCuadro(Vehiculo v) {
         System.out.println("----------------------------------------");
-        System.out.println("|    DETALLES DEL VEHÍCULO (A)         |");
+        System.out.println("|    DETALLES DEL VEHICULO (A)         |");
         System.out.println("----------------------------------------");
-        System.out.println("| ID Vehículo: " + v.getId());
+        System.out.println("| ID Vehiculo: " + v.getId());
         System.out.println("| Dominio:     " + v.getDominio());
         System.out.println("| Marca:       " + v.getMarca());
         System.out.println("| Modelo:      " + v.getModelo());
-        System.out.println("| Año:         " + v.getAnio());
+        System.out.println("| Ano:         " + v.getAnio());
         System.out.println("| Nro. Chasis: " + v.getNroChasis());
         System.out.println("| Eliminado:   " + v.isEliminado());
         System.out.println("----------------------------------------");
@@ -373,7 +317,7 @@ public class MenuHandler {
             System.out.println("----------------------------------------");
             System.out.println("| ID Seguro:   " + s.getId());
             System.out.println("| Aseguradora: " + s.getAseguradora());
-            System.out.println("| Nro. Póliza: " + s.getNroPoliza());
+            System.out.println("| Nro. Poliza: " + s.getNroPoliza());
             System.out.println("| Cobertura:   " + s.getCobertura());
             System.out.println("| Vencimiento: " + s.getVencimiento());
             System.out.println("| ID Veh. (FK):" + s.getIdVehiculo());
@@ -384,10 +328,11 @@ public class MenuHandler {
     }
 
     /**
-     * MÉTODO NUEVO: Pausa la ejecución hasta que el usuario presione Enter.
+     * METODO NUEVO: Pausa la ejecucion hasta que el usuario presione Enter.
+     * Es 'public' para ser llamado desde AppMenu.
      */
-    private void pausarParaContinuar() {
-        System.out.println("\nPresione [Enter] para volver al menú...");
+    public void pausarParaContinuar() {
+        System.out.println("\nPresione [Enter] para volver al menu...");
         scanner.nextLine();
     }
 }
