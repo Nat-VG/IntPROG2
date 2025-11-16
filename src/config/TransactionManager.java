@@ -26,6 +26,8 @@ public class TransactionManager implements AutoCloseable {
         }
         conn.setAutoCommit(false);
         transactionActive = true;
+        //  LOGGING DE INICIO
+        System.out.println("--- LOG: Transaccion INICIADA (AutoCommit=false) ---");
     }
 
     public void commit() throws SQLException {
@@ -33,6 +35,8 @@ public class TransactionManager implements AutoCloseable {
             throw new SQLException("No hay una transaccion activa para hacer commit.");
         }
         conn.commit();
+        // LOGGING DE COMMIT EXITOSO
+        System.out.println("--- LOG: Transaccion finalizada con COMMIT. ---");
         transactionActive = false;
     }
 
@@ -40,6 +44,8 @@ public class TransactionManager implements AutoCloseable {
         if (conn != null && transactionActive) {
             try {
                 conn.rollback();
+                //  LOGGING DE ROLLBACK
+                System.err.println("!!! LOG: ROLLBACK ejecutado exitosamente. Los cambios se descartaron. !!!");
                 transactionActive = false;
             } catch (SQLException e) {
                 System.err.println("Error MUY GRAVE durante el rollback: " + e.getMessage());
@@ -52,7 +58,7 @@ public class TransactionManager implements AutoCloseable {
         if (conn != null) {
             try {
                 if (transactionActive) {
-                    System.err.println("Advertencia: Transaccion cerrada sin commit. Ejecutando rollback automatico.");
+                    System.err.println("Advertencia: Transaccion cerrada sin commit explicito. Ejecutando rollback automatico.");
                     rollback();
                 }
                 conn.setAutoCommit(true);
