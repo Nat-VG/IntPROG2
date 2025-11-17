@@ -99,16 +99,10 @@ Archivo: `sql/Script_unico.sql` (idempotente: borra, crea y pobla). Ejecutar sie
 - Puertos distintos: modificar URL JDBC.
 - Colisión de dominio/póliza: mensaje de unicidad desde capa Service.
 
-## 13. Extensiones Futuras (Opcional)
-- Filtros: vehículos sin seguro, seguros próximos a vencer.
-- Externalizar credenciales en archivo `.properties`.
-- Tests unitarios (JUnit) para validaciones y transacciones.
-- Exportar reportes (CSV / JSON).
-
-## 14. Dependencias
+## 13. Dependencias
 - MySQL Connector J 8.0.30 (incluido).
 
-## 15. Ejemplo Rápido (Crear Vehículo con Seguro)
+## 14. Ejemplo Rápido (Crear Vehículo con Seguro)
 Ingresar opción 1 y seguir los prompts:
 ```
 Dominio: AA123BB
@@ -123,5 +117,5 @@ Cobertura (RC/TERCEROS/TODO_RIESGO): RC
 Vencimiento (YYYY-MM-DD): 2026-05-01
 ```
 
-## 16. Licencia / Uso Académico
+## 15. Licencia / Uso Académico
 Proyecto educativo para el Trabajo Práctico Integrador de Programación II.
