@@ -11,7 +11,7 @@ Sistema de consola (Java + MySQL) que gestiona vehículos (Entidad A) y seguros 
 
 ## 2. Clonado del Proyecto
 Clonar el repositorio (ya realizado en tu entorno):
-```powershell
+```
 git clone https://github.com/Nat-VG/IntPROG2.git
 ```
 Abrir el proyecto en NetBeans: *File > Open Project* y seleccionar la carpeta `IntPROG2`.
@@ -28,16 +28,8 @@ Abrir el proyecto en NetBeans: *File > Open Project* y seleccionar la carpeta `I
 		 - Define `UNIQUE` en `dominio`, `nroPoliza` y `idVehiculo`
 		 - Inserta datos de prueba
 
-Ejemplo usando CLI (opcional):
-```powershell
-mysql -u root -p < .\sql\Script_unico.sql
-```
-
 ## 4. Configuración de Conexión
 Editar `src/config/DatabaseConnection.java` y establecer la contraseña MySQL:
-```java
-private static final String PASSWORD = "TU_CONTRASENA"; // Ajustar
-```
 Si usas otro usuario/puerto, actualiza también `URL` y `USER`.
 
 ## 5. Añadir el Driver JDBC (si NetBeans no lo detecta)
@@ -51,15 +43,6 @@ Método recomendado: desde NetBeans.
 1. Asegúrate de haber configurado la contraseña en `DatabaseConnection`.
 2. Run Project o ejecutar la clase `main.AppMenu` (tiene el método `main`).
 3. Se mostrará el menú interactivo en la consola.
-
-Opcional (con JAR ejecutable): si se configura el `Main-Class` en el manifest (NetBeans suele generarlo al crear el artefacto), se puede ejecutar:
-```powershell
-java -jar dist/TPI_PROGRAMACIONII.jar
-```
-Si no está el `Main-Class`, ejecutar directamente:
-```powershell
-java -cp "dist/TPI_PROGRAMACIONII.jar;mysql-connector-java-8.0.30.jar" main.AppMenu
-```
 
 ## 7. Menú y Funcionalidades
 CRUD Compuesto (Vehículo + Seguro):
@@ -123,7 +106,7 @@ Archivo: `sql/Script_unico.sql` (idempotente: borra, crea y pobla). Ejecutar sie
 - Exportar reportes (CSV / JSON).
 
 ## 14. Dependencias
-- MySQL Connector J 8.0.30 (incluido). No se usan frameworks ORM (mapeo manual para fines didácticos).
+- MySQL Connector J 8.0.30 (incluido).
 
 ## 15. Ejemplo Rápido (Crear Vehículo con Seguro)
 Ingresar opción 1 y seguir los prompts:
@@ -142,7 +125,3 @@ Vencimiento (YYYY-MM-DD): 2026-05-01
 
 ## 16. Licencia / Uso Académico
 Proyecto educativo para el Trabajo Práctico Integrador de Programación II.
-
----
-Si encuentras algún problema al ejecutar, revisa primero credenciales y script SQL. Para soporte adicional, documentar el error mostrado en consola.
-
